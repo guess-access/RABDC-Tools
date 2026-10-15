@@ -492,8 +492,9 @@ a{color:inherit;}
 .trk-num{font-family:var(--font-display);font-size:32px;font-weight:700;color:var(--white);line-height:1;text-align:center;}
 .trk-stat.big .trk-num{font-size:44px;color:var(--green);}
 .trk-lbl{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--white);letter-spacing:.01em;margin-top:4px;text-align:center;line-height:1.2;text-transform:none;}
-.trk-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;}
-.trk-day{background:var(--graphite-800);border:1px solid var(--graphite-700);border-radius:var(--radius);padding:8px 6px;min-height:150px;display:flex;flex-direction:column;}
+.trk-sub{font-size:11.5px;font-style:italic;color:var(--steel-300);text-align:center;line-height:1.25;}
+.trk-days{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;}
+.trk-day{background:var(--graphite-800);border:1px solid var(--graphite-700);border-radius:var(--radius);padding:8px 6px;min-height:150px;flex:1 0 150px;min-width:150px;display:flex;flex-direction:column;}
 .trk-day.today{border-color:var(--amber);}
 .trk-dayname{font-family:var(--font-mono);font-size:11px;color:var(--steel-300);text-transform:uppercase;display:flex;justify-content:space-between;}
 .trk-dayname span{color:var(--steel-400);}
@@ -506,18 +507,6 @@ a{color:inherit;}
 .trk-appt .a-name{font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .trk-appt .a-name b{font-family:var(--font-mono);font-weight:700;}
 .trk-appt em{color:#fff;background:var(--green);font-style:normal;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:100px;display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;}
-.trk-weeks{display:flex;flex-direction:column;gap:8px;}
-.trk-wrow{display:grid;grid-template-columns:110px 1fr 70px;gap:10px;align-items:center;font-size:12px;color:var(--steel-300);}
-.trk-wbar{position:relative;height:14px;background:var(--graphite-800);}
-.trk-wbar i{position:absolute;left:0;top:0;height:100%;display:block;}
-.trk-wbar i.a{background:var(--graphite-600);}
-.trk-wbar i.s{background:var(--green);height:60%;top:20%;}
-.trk-wnum{text-align:right;font-family:var(--font-mono);}
-.trk-wnum b{color:var(--green);}
-.trk-legend{font-size:11px;color:var(--steel-400);display:flex;gap:6px;align-items:center;margin-top:4px;}
-.trk-legend span{width:10px;height:10px;display:inline-block;}
-.trk-legend .s{background:var(--green);}
-.trk-legend .a{background:var(--graphite-600);margin-left:8px;}
 .trk-raw-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0;}
 .trk-raw-toolbar .trk-input{min-width:200px;flex:1;}
 .trk-seg{display:flex;gap:4px;}
@@ -534,10 +523,9 @@ a{color:inherit;}
 .trk-pill.pend{color:var(--amber);border-color:var(--amber-dim);}
 .trk-count{font-size:11.5px;color:var(--steel-400);font-family:var(--font-mono);}
 @media(max-width:700px){
-  .trk-days{grid-template-columns:1fr;}
-  .trk-day{min-height:0;flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center;}
+  .trk-days{display:grid;grid-template-columns:1fr;}
+  .trk-day{min-height:0;min-width:0;flex:none;flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center;}
   .trk-bar{display:none;}
-  .trk-wrow{grid-template-columns:90px 1fr 56px;}
 }
 /* ===== Prime Kreatives brand layer (Fraunces / Work Sans / Space Mono, paper + navy/indigo + gold/sand) ===== */
 body{background:var(--pk-paper);color:var(--pk-ink);}
@@ -664,7 +652,7 @@ img,svg,table{max-width:100%;}
         <a class="btn-link" href="https://unrubble.com/" target="_blank" rel="noopener">Unrubble</a>
         <a class="btn-link" href="https://app.aloware.io/login" target="_blank" rel="noopener">Alloware</a>
         <a class="btn-link" href="https://www.centereachhyundai.com/" target="_blank" rel="noopener">Dealer Website</a>
-        <a class="btn-link" href="https://docs.google.com/spreadsheets/d/1BRq2xRjFZPQkjn0GXyfCZPUf42AdIlIujqGOfzuSdXA/edit?pli=1&amp;gid=1143598152#gid=1143598152" target="_blank" rel="noopener">CH Leads Tracker</a>
+        <a class="btn-link" href="https://docs.google.com/spreadsheets/d/1WqqTaBpNh274tCFz3A3vkAMuFuQpxKgGww5q2S_4QnQ/edit?pli=1&amp;gid=1922708263#gid=1922708263" target="_blank" rel="noopener">Peter's Tracker</a>
       </div>
     </div>
 
@@ -1729,7 +1717,7 @@ function viewPractices(){
 /* =========================================================================
    Appointment Sales Tracker & Counter (Google Sheet)
    - Rep column = unique identifier (default PL)
-   - Week runs Sunday -> Saturday
+   - Month view: one column per day, week runs Sunday -> Saturday
    - "Show" = Rep is PL AND RO column is not blank (unique RO count)
 ========================================================================= */
 const TRK_DEFAULTS = {
@@ -1748,8 +1736,8 @@ const trk = {
   error:"",
   headers:[],
   rows:[],           // array of objects keyed by header
-  weekOffset:0,
-  monthOffset:0,
+  monthOffset:0,     // months away from the current month (0 = this month)
+  scrolledToWeek:false, // jump the day grid to the current week only on first load
   showSettings:false,
   loadedAt:null,
   rawQuery:"",
@@ -1809,10 +1797,13 @@ function trkFindCol(headers, exact, contains){
 }
 function trkCols(){
   const h=trk.headers, c=trk.cfg;
+  const date = c.dateCol || trkFindCol(h,["date made","date_made","datemade"],["date made","made"]) || trkFindCol(h,["appt date","appointment date","date"],["appt date","appointment","date"]);
+  // Fixed Data Source fallback: G=Appt Date (index 6), F=Date Made (index 5)
+  const dateFix = date || (h.length>=7&&h[6] ? h[6] : (h.length>=6&&h[5] ? h[5] : ""));
   return {
     rep: c.repCol || trkFindCol(h,["rep"],["rep"]),
     ro:  c.roCol  || trkFindCol(h,["ro","ro#","ro #","ro number"],["ro"]),
-    date:c.dateCol|| trkFindCol(h,["date made","date_made","datemade"],["date made","made"]) || trkFindCol(h,["appt date","appointment date","date"],["appt date","appointment","date"]),
+    date:dateFix,
     time:trkFindCol(h,["time","appt time"],["time"]),
     cust:trkFindCol(h,["customer","customer name","name"],["customer","name"])
   };
@@ -1927,11 +1918,6 @@ async function trkLoad(){
   trkRender();
 }
 
-function trkStartOfWeek(d){ // Sunday
-  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  x.setDate(x.getDate()-x.getDay());
-  return x;
-}
 function trkSameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
 function trkFmt(d,o){ return d.toLocaleDateString("en-US",o); }
 
@@ -1977,7 +1963,7 @@ function trkRender(){
     if(!cols.rep||!cols.date){
       body+=`<div class="trk-msg err">Couldn't find the ${!cols.rep?"<b>Rep</b>":""}${!cols.rep&&!cols.date?" and ":""}${!cols.date?"<b>Date</b>":""} column. Open ⚙ Settings and pick the right column(s).</div>`;
     }else{
-      body+=trkWeekHTML(rows,cols)+trkRawWeekHTML(rows,cols)+trkMonthHTML(rows,cols);
+      body+=trkMonthHTML(rows,cols)+trkMonthRawHTML(rows,cols);
     }
   }
   const settings=trk.showSettings?trkSettingsHTML():"";
@@ -1990,6 +1976,23 @@ function trkRender(){
     </div>
     ${settings}
     ${body}`;
+  trkScrollToWeek();
+}
+
+/* On a fresh page open, scroll the day grid to the week that contains today */
+function trkScrollToWeek(){
+  if(trk.scrolledToWeek) return;
+  const wrap=document.querySelector(".trk-days");
+  if(!wrap) return;
+  const now=new Date();
+  const key=d=>d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+  const weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay()); // Sunday
+  const cols=[].slice.call(wrap.querySelectorAll(".trk-day[data-date]"));
+  if(!cols.length) return;
+  let target=cols.filter(c=>c.getAttribute("data-date")===key(weekStart))[0];
+  if(!target) target=cols.filter(c=>c.classList.contains("today"))[0]||cols[0];
+  wrap.scrollLeft=target.offsetLeft-wrap.offsetLeft;
+  trk.scrolledToWeek=true;
 }
 
 function trkSettingsHTML(){
@@ -2009,33 +2012,47 @@ function trkSettingsHTML(){
   </div>`;
 }
 
-function trkStat(label,val,cls){ return `<div class="trk-stat ${cls||""}"><div class="trk-num">${val}</div><div class="trk-lbl">${label}</div></div>`; }
+function trkStat(label,val,cls,sub){ return `<div class="trk-stat ${cls||""}"><div class="trk-num">${val}</div><div class="trk-lbl">${label}</div>${sub?`<div class="trk-sub">${sub}</div>`:""}</div>`; }
 
-function trkWeekHTML(rows,cols){
+function trkMonthRange(){
   const today=new Date();
-  const start=trkStartOfWeek(today); start.setDate(start.getDate()+trk.weekOffset*7);
-  const end=new Date(start); end.setDate(end.getDate()+6);
-  const inWeek=rows.filter(x=>x.d>=start&&x.d<=end);
-  const shows=trkUniqueShows(inWeek);
-  const todayCount=rows.filter(x=>trkSameDay(x.d,today)).length;
+  const first=new Date(today.getFullYear(),today.getMonth()+trk.monthOffset,1);
+  const last=new Date(first.getFullYear(),first.getMonth()+1,0);
+  return {first,last};
+}
+
+function trkMonthHTML(rows,cols){
+  const today=new Date();
+  const {first,last}=trkMonthRange();
+  const inMonth=rows.filter(x=>x.d>=first&&x.d<=last);
+  const shows=trkUniqueShows(inMonth);
+  const rate=inMonth.length?Math.round(shows/inMonth.length*100):0;
+  // INACTIVE appointments: Service Type (Column E) contains the word INACTIVE
+  // AND the row has an RO - both rules must be met to be counted.
+  // Multi-service entries (separated by "/") still count.
+  const inactive=inMonth.filter(x=>x.show&&/inactive/i.test(x.service||"")).length;
+  const inactiveSub=inactive>=90?"Tier II goal reached":inactive>=60?(90-inactive)+" more for Tier II":(60-inactive)+" more for Tier I";
+  const daysInMonth=last.getDate();
   const days=[];
-  for(let i=0;i<7;i++){
-    const d=new Date(start); d.setDate(d.getDate()+i);
-    const list=inWeek.filter(x=>trkSameDay(x.d,d)).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+  // always start the grid on the 1st of the month - no blank filler cells
+  for(let i=0;i<daysInMonth;i++){
+    const d=new Date(first.getFullYear(),first.getMonth(),i+1);
+    const list=inMonth.filter(x=>trkSameDay(x.d,d)).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
     days.push({d,list});
   }
   const maxCount=Math.max(1,...days.map(x=>x.list.length));
-  const label=trk.weekOffset===0?"This Week":trk.weekOffset===-1?"Last Week":trk.weekOffset===1?"Next Week":"Week";
-  const spiff=inWeek.length>=70?{v:"Tier II",c:"good"}:inWeek.length>=60?{v:"Tier I",c:"good"}:{v:(60-inWeek.length)+" to 60",c:"amber"};
+  const label=trk.monthOffset===0?"This Month":trk.monthOffset===-1?"Last Month":trk.monthOffset===1?"Next Month":trkFmt(first,{month:"long"});
+  // Show goals: Tier I = 120 shows, Tier II = 135 shows
+  const showsSub=shows>=135?"Tier II goal reached":shows>=120?(135-shows)+" more for Tier II":(120-shows)+" more for Tier I";
   return `
   <div class="trk-panel">
     <div class="trk-head">
       <div><div class="trk-title">${label} <span style="font-size:12px;color:var(--steel-400)">· by ${trk.dateMode==="made"?"Date Made":"Appt Date"}</span></div>
-        <div class="trk-range">${trkFmt(start,{month:"short",day:"numeric"})} (Sun) – ${trkFmt(end,{month:"short",day:"numeric",year:"numeric"})} (Sat)</div></div>
+        <div class="trk-range">${trkFmt(first,{month:"short",day:"numeric"})} (${trkFmt(first,{weekday:"short"})}) – ${trkFmt(last,{month:"short",day:"numeric",year:"numeric"})} (${trkFmt(last,{weekday:"short"})}) · ${daysInMonth} days</div></div>
       <div class="trk-nav">
-        <button class="trk-btn" data-trk="wprev">‹</button>
-        <button class="trk-btn" data-trk="wnow">Today</button>
-        <button class="trk-btn" data-trk="wnext">›</button>
+        <button class="trk-btn" data-trk="mprev">‹</button>
+        <button class="trk-btn" data-trk="mnow">This Month</button>
+        <button class="trk-btn" data-trk="mnext">›</button>
         <div class="trk-seg">
           <button class="trk-btn ${trk.dateMode==="appt"?"active":""}" data-trk="mode-appt">Appt Date</button>
           <button class="trk-btn ${trk.dateMode==="made"?"active":""}" data-trk="mode-made">Date Made</button>
@@ -2043,15 +2060,15 @@ function trkWeekHTML(rows,cols){
       </div>
     </div>
     <div class="trk-stats">
-      ${trkStat("Appointments",inWeek.length)}
-      ${trkStat("Shows (RO)",shows,"good")}
-      ${trkStat("Pending / No RO",inWeek.filter(x=>!x.show).length,"warn")}
-      ${trkStat("Spiff Update",spiff.v,spiff.c)}
+      ${trkStat("Appointments",inMonth.length)}
+      ${trkStat("Shows (RO)",shows,"good",showsSub)}
+      ${trkStat("Show Rate",rate+"%","amber")}
+      ${trkStat("Inactive Appts",inactive,"warn",inactiveSub)}
     </div>
     <div class="trk-days">
       ${days.map(({d,list})=>{
         const isToday=trkSameDay(d,today);
-        return `<div class="trk-day ${isToday?"today":""}">
+        return `<div class="trk-day ${isToday?"today":""}" data-date="${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}">
           <div class="trk-dayname">${trkFmt(d,{weekday:"short"})}<span>${trkFmt(d,{month:"numeric",day:"numeric"})}</span></div>
           <div class="trk-daycount">${list.length}</div>
           <div class="trk-bar"><i style="width:${Math.round(list.length/maxCount*100)}%"></i></div>
@@ -2062,16 +2079,10 @@ function trkWeekHTML(rows,cols){
   </div>`;
 }
 
-function trkWeekRange(){
-  const today=new Date();
-  const start=trkStartOfWeek(today); start.setDate(start.getDate()+trk.weekOffset*7);
-  const end=new Date(start); end.setDate(end.getDate()+6);
-  end.setHours(23,59,59,999);
-  return {start,end};
-}
-
-function trkRawWeekHTML(rows,cols){
-  const {start,end}=trkWeekRange();
+function trkMonthRawHTML(rows,cols){
+  const {first,last}=trkMonthRange();
+  const end=new Date(last); end.setHours(23,59,59,999);
+  const start=first;
   let list=rows.filter(x=>x.d>=start&&x.d<=end);
   list=list.slice().sort((a,b)=>a.d-b.d||String(a.time).localeCompare(String(b.time)));
   const q=(trk.rawQuery||"").trim().toLowerCase();
@@ -2079,14 +2090,14 @@ function trkRawWeekHTML(rows,cols){
   if(trk.rawFilter==="pend") list=list.filter(x=>!x.show);
   if(q) list=list.filter(x=>((x.vin||"")+" "+(x.cust||"")+" "+(x.phone||"")+" "+(x.service||"")+" "+(x.dateMade||"")+" "+(x.apptDate||"")+" "+(x.ro||"")+" "+(x.notes||"")).toLowerCase().includes(q));
   const shows=list.filter(x=>x.show).length;
-  const label=trk.weekOffset===0?"This Week":trk.weekOffset===-1?"Last Week":trk.weekOffset===1?"Next Week":"Week of "+trkFmt(start,{month:"short",day:"numeric"});
+  const label=trk.monthOffset===0?"This Month":trk.monthOffset===-1?"Last Month":trk.monthOffset===1?"Next Month":trkFmt(start,{month:"long",year:"numeric"});
   const rowsHtml=list.map(x=>{
     return `<tr><td style="font-family:var(--font-mono);white-space:nowrap">${esc(x.vin||"—")}</td><td>${esc(x.cust||"—")}</td><td style="white-space:nowrap">${esc(x.phone||"—")}</td><td>${esc(x.service||"—")}</td><td style="white-space:nowrap">${esc(x.dateMade||"—")}</td><td style="white-space:nowrap">${esc(x.apptDate||trkFmt(x.d,{month:"short",day:"numeric"}))}</td><td style="font-family:var(--font-mono)">${esc(x.ro||"—")}</td><td>${esc(x.notes||"—")}</td></tr>`;
   }).join("");
   return `
   <div class="trk-panel">
     <div class="trk-head">
-      <div><div class="trk-title">Weekly Appointments <span style="font-size:12px;color:var(--steel-400)">· ${esc(label)} · by ${trk.dateMode==="made"?"Date Made":"Appt Date"}</span></div>
+      <div><div class="trk-title">Monthly Appointments <span style="font-size:12px;color:var(--steel-400)">· ${esc(label)} · by ${trk.dateMode==="made"?"Date Made":"Appt Date"}</span></div>
         <div class="trk-range">${trkFmt(start,{month:"short",day:"numeric"})} – ${trkFmt(end,{month:"short",day:"numeric",year:"numeric"})} · <span class="trk-count">${list.length} appts · ${shows} shows</span></div></div>
       <div class="trk-nav">
         <div class="trk-seg">
@@ -2109,14 +2120,15 @@ function trkRawWeekHTML(rows,cols){
     <div class="trk-tablewrap">
       <table class="trk-table">
         <thead><tr><th>VIN</th><th>Name</th><th>Phone #</th><th>Service Type</th><th>Date Made</th><th>Appt Date</th><th>RO</th><th>Notes</th></tr></thead>
-        <tbody>${rowsHtml||'<tr><td colspan="8" style="color:var(--steel-400)">No appointments match this filter for this week.</td></tr>'}</tbody>
+        <tbody>${rowsHtml||'<tr><td colspan="8" style="color:var(--steel-400)">No appointments match this filter for this month.</td></tr>'}</tbody>
       </table>
     </div>`:""}
   </div>`;
 }
 
-function trkDownloadWeekCSV(){
-  const {start,end}=trkWeekRange();
+function trkDownloadMonthCSV(){
+  const {first,last}=trkMonthRange();
+  const start=first, end=new Date(last); end.setHours(23,59,59,999);
   let list=rows_cache_sorted();
   function rows_cache_sorted(){
     let l=trkMyRows().rows.filter(x=>x.d>=start&&x.d<=end);
@@ -2135,51 +2147,8 @@ function trkDownloadWeekCSV(){
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="weekly-appointment-details-"+start.toLocaleDateString("en-CA")+".csv";
+  a.download="monthly-appointment-details-"+start.toLocaleDateString("en-CA")+".csv";
   document.body.appendChild(a); a.click(); a.remove();
-}
-
-function trkMonthHTML(rows,cols){
-  const now=new Date();  const first=new Date(now.getFullYear(),now.getMonth()+trk.monthOffset,1);
-  const last=new Date(first.getFullYear(),first.getMonth()+1,0);
-  const inMonth=rows.filter(x=>x.d>=first&&x.d<=last);
-  const shows=trkUniqueShows(inMonth);
-  const rate=inMonth.length?Math.round(shows/inMonth.length*100):0;
-  // Sun-Sat week buckets inside the month
-  const weeks=[];
-  let ws=trkStartOfWeek(first);
-  while(ws<=last){
-    const we=new Date(ws); we.setDate(we.getDate()+6);
-    const list=inMonth.filter(x=>x.d>=ws&&x.d<=we);
-    weeks.push({ws:new Date(ws),we,appts:list.length,shows:trkUniqueShows(list)});
-    ws=new Date(ws); ws.setDate(ws.getDate()+7);
-  }
-  const maxW=Math.max(1,...weeks.map(w=>w.appts));
-  return `
-  <div class="trk-panel">
-    <div class="trk-head">
-      <div><div class="trk-title">${trkFmt(first,{month:"long",year:"numeric"})}</div>
-        <div class="trk-range">Monthly view · Show = Rep ${esc(trk.cfg.rep.toUpperCase())} + RO not blank (unique)</div></div>
-      <div class="trk-nav">
-        <button class="trk-btn" data-trk="mprev">‹</button>
-        <button class="trk-btn" data-trk="mnow">This Month</button>
-        <button class="trk-btn" data-trk="mnext">›</button>
-      </div>
-    </div>
-    <div class="trk-stats">
-      ${trkStat("# of Show Appts",shows,"good big")}
-      ${trkStat("Total Appts",inMonth.length)}
-      ${trkStat("Show Rate",rate+"%","amber")}
-    </div>
-    <div class="trk-weeks">
-      ${weeks.map(w=>`<div class="trk-wrow">
-        <div class="trk-wlabel">${trkFmt(w.ws,{month:"short",day:"numeric"})} – ${trkFmt(w.we,{month:"short",day:"numeric"})}</div>
-        <div class="trk-wbar"><i class="a" style="width:${w.appts/maxW*100}%"></i><i class="s" style="width:${w.shows/maxW*100}%"></i></div>
-        <div class="trk-wnum"><b>${w.shows}</b> / ${w.appts}</div>
-      </div>`).join("")}
-      <div class="trk-legend"><span class="s"></span>Shows <span class="a"></span>Appointments</div>
-    </div>
-  </div>`;
 }
 
 document.addEventListener("click",(e)=>{
@@ -2197,9 +2166,6 @@ document.addEventListener("click",(e)=>{
     trk.cfg.pubUrl=document.getElementById("trkPub").value.trim();
     trkSaveCfg(); return trkLoad();
   }
-  if(a==="wprev") trk.weekOffset--;
-  if(a==="wnext") trk.weekOffset++;
-  if(a==="wnow") trk.weekOffset=0;
   if(a==="mprev") trk.monthOffset--;
   if(a==="mnext") trk.monthOffset++;
   if(a==="mnow") trk.monthOffset=0;
@@ -2207,7 +2173,7 @@ document.addEventListener("click",(e)=>{
   if(a==="rawshow"){ trk.rawFilter="show"; return trkRender(); }
   if(a==="rawpend"){ trk.rawFilter="pend"; return trkRender(); }
   if(a==="rawtoggle"){ trk.rawOpen=!trk.rawOpen; return trkRender(); }
-  if(a==="rawcsv") return trkDownloadWeekCSV();
+  if(a==="rawcsv") return trkDownloadMonthCSV();
   if(a==="mode-appt"){ trk.dateMode="appt"; try{localStorage.setItem("trkDateMode","appt");}catch(e){} return trkRender(); }
   if(a==="mode-made"){ trk.dateMode="made"; try{localStorage.setItem("trkDateMode","made");}catch(e){} return trkRender(); }
   trkRender();
