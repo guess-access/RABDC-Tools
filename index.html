@@ -61,8 +61,11 @@ a{color:inherit;}
   z-index:50;
 }
 .brand{
-  padding:18px 16px 14px;border-bottom:1px solid var(--graphite-700);text-align:center;
+  padding:16px 16px 14px;border-bottom:1px solid var(--graphite-700);text-align:center;
 }
+.brand-logo{width:100%;height:150px;margin:0 auto 10px;}
+.brand-logo canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none;}
+.brand-logo canvas:active{cursor:grabbing;}
 .brand .tag{
   font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;
 }
@@ -147,7 +150,7 @@ a{color:inherit;}
 
 /* ===== Content ===== */
 .content{padding:22px 26px 60px;flex:1;}
-.content-inner{max-width:1080px;margin:0 auto;}
+.content-inner{max-width:none;margin:0 auto;}
 
 .eyebrow{
   font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--amber);
@@ -493,7 +496,15 @@ a{color:inherit;}
 .trk-stat.big .trk-num{font-size:44px;color:var(--green);}
 .trk-lbl{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--white);letter-spacing:.01em;margin-top:4px;text-align:center;line-height:1.2;text-transform:none;}
 .trk-sub{font-size:11.5px;font-style:italic;color:var(--steel-300);text-align:center;line-height:1.25;}
-.trk-days{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;}
+.trk-days{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;}
+.trk-days::-webkit-scrollbar{display:none;}
+.trk-daysbar{overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:8px;scrollbar-width:thin;}
+.trk-daysbar::-webkit-scrollbar{height:10px;}
+.trk-daysbar::-webkit-scrollbar-track{background:var(--graphite-800);border-radius:6px;}
+.trk-daysbar::-webkit-scrollbar-thumb{background:var(--graphite-600);border-radius:6px;}
+.trk-daysbar i{display:block;height:1px;}
+.trk-more{margin-top:6px;background:var(--graphite-700);border:1px dashed var(--graphite-600);color:var(--pk-sand);font-family:var(--font-mono);font-size:10.5px;letter-spacing:.04em;padding:4px 6px;border-radius:8px;cursor:pointer;text-align:center;}
+.trk-more:hover{border-color:var(--amber);color:var(--amber);}
 .trk-day{background:var(--graphite-800);border:1px solid var(--graphite-700);border-radius:var(--radius);padding:8px 6px;min-height:150px;flex:1 0 150px;min-width:150px;display:flex;flex-direction:column;}
 .trk-day.today{border-color:var(--amber);}
 .trk-dayname{font-family:var(--font-mono);font-size:11px;color:var(--steel-300);text-transform:uppercase;display:flex;justify-content:space-between;}
@@ -625,6 +636,7 @@ img,svg,table{max-width:100%;}
 <div class="app">
   <nav class="sidebar" id="sidebar">
     <div class="brand">
+      <div class="brand-logo" id="brandLogo"><canvas id="brandCanvas"></canvas></div>
       <div class="tag">BDC Reference System</div>
       <h1>Service Knowledge Base</h1>
       <div class="dealer">Centereach Hyundai</div>
@@ -1738,6 +1750,8 @@ const trk = {
   rows:[],           // array of objects keyed by header
   monthOffset:0,     // months away from the current month (0 = this month)
   scrolledToWeek:false, // jump the day grid to the current week only on first load
+  daysScroll:0,      // remembered horizontal position of the day grid
+  openDays:{},       // day keys the user expanded with "+N more"
   showSettings:false,
   loadedAt:null,
   rawQuery:"",
@@ -1967,6 +1981,9 @@ function trkRender(){
     }
   }
   const settings=trk.showSettings?trkSettingsHTML():"";
+  // remember where the user had scrolled the day grid so re-renders keep the position
+  const prevDays=document.querySelector(".trk-days");
+  if(prevDays) trk.daysScroll=prevDays.scrollLeft;
   el.innerHTML=`
     <div class="section-heading">Appointment Sales Tracker &amp; Counter <span class="trk-rep">${esc(c.rep.toUpperCase())}</span></div>
     <div class="trk-toolbar">
@@ -1976,7 +1993,25 @@ function trkRender(){
     </div>
     ${settings}
     ${body}`;
+  trkSyncDaysBar();
   trkScrollToWeek();
+}
+
+/* Top scrollbar above the day grid: sized to the grid and kept in sync both ways */
+function trkSyncDaysBar(){
+  const days=document.querySelector(".trk-days");
+  const bar=document.querySelector(".trk-daysbar");
+  const spacer=document.getElementById("trkDaysSpacer");
+  if(!days||!bar||!spacer) return;
+  spacer.style.width=days.scrollWidth+"px";
+  days.scrollLeft=trk.daysScroll||0;
+  bar.scrollLeft=trk.daysScroll||0;
+  if(bar._wired) return;
+  bar._wired=true;
+  const link=(from,to)=>{
+    from.addEventListener("scroll",()=>{ trk.daysScroll=from.scrollLeft; to.scrollLeft=from.scrollLeft; },{passive:true});
+  };
+  link(days,bar); link(bar,days);
 }
 
 /* On a fresh page open, scroll the day grid to the week that contains today */
@@ -1991,7 +2026,11 @@ function trkScrollToWeek(){
   if(!cols.length) return;
   let target=cols.filter(c=>c.getAttribute("data-date")===key(weekStart))[0];
   if(!target) target=cols.filter(c=>c.classList.contains("today"))[0]||cols[0];
-  wrap.scrollLeft=target.offsetLeft-wrap.offsetLeft;
+  const pos=target.offsetLeft-wrap.offsetLeft;
+  wrap.scrollLeft=pos;
+  const bar=document.querySelector(".trk-daysbar");
+  if(bar) bar.scrollLeft=pos;
+  trk.daysScroll=pos;
   trk.scrolledToWeek=true;
 }
 
@@ -2013,6 +2052,8 @@ function trkSettingsHTML(){
 }
 
 function trkStat(label,val,cls,sub){ return `<div class="trk-stat ${cls||""}"><div class="trk-num">${val}</div><div class="trk-lbl">${label}</div>${sub?`<div class="trk-sub">${sub}</div>`:""}</div>`; }
+
+const TRK_DAY_LIMIT = 15; // appointments shown per day column before "+N more"
 
 function trkMonthRange(){
   const today=new Date();
@@ -2065,15 +2106,23 @@ function trkMonthHTML(rows,cols){
       ${trkStat("Show Rate",rate+"%","amber")}
       ${trkStat("Inactive Appts",inactive,"warn",inactiveSub)}
     </div>
+    <div class="trk-daysbar"><i id="trkDaysSpacer"></i></div>
     <div class="trk-days">
       ${days.map(({d,list})=>{
         const isToday=trkSameDay(d,today);
-        return `<div class="trk-day ${isToday?"today":""}" data-date="${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}">
+        const key=d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+        const open=!!trk.openDays[key];
+        const shown=open?list:list.slice(0,TRK_DAY_LIMIT);
+        const rest=list.length-shown.length;
+        return `<div class="trk-day ${isToday?"today":""}" data-date="${key}">
           <div class="trk-dayname">${trkFmt(d,{weekday:"short"})}<span>${trkFmt(d,{month:"numeric",day:"numeric"})}</span></div>
           <div class="trk-daycount">${list.length}</div>
           <div class="trk-bar"><i style="width:${Math.round(list.length/maxCount*100)}%"></i></div>
-          <div class="trk-daylist">${list.map(x=>`<div class="trk-appt ${x.show?"show":""}" title="${esc((x.cust||"Appt")+(x.show?" — RO "+x.ro:" — No RO yet"))}">
-              <span class="a-name">${x.time?`<b>${esc(x.time)}</b> `:""}${esc(x.cust||"Appt")}</span>${x.show?`<em>RO ${esc(x.ro)}</em>`:""}</div>`).join("")}</div>
+          <div class="trk-daylist">${shown.map(x=>`<div class="trk-appt ${x.show?"show":""}" title="${esc((x.cust||"Appt")+(x.show?" — RO "+x.ro:" — No RO yet"))}">
+              <span class="a-name">${x.time?`<b>${esc(x.time)}</b> `:""}${esc(x.cust||"Appt")}</span>${x.show?`<em>RO ${esc(x.ro)}</em>`:""}</div>`).join("")}
+            ${rest>0?`<button class="trk-more" type="button" data-trk="more" data-day="${key}">+${rest} more</button>`:""}
+            ${open&&list.length>TRK_DAY_LIMIT?`<button class="trk-more" type="button" data-trk="more" data-day="${key}">Less</button>`:""}
+          </div>
         </div>`;}).join("")}
     </div>
   </div>`;
@@ -2165,6 +2214,10 @@ document.addEventListener("click",(e)=>{
     trk.cfg.gid=document.getElementById("trkGid").value.trim();
     trk.cfg.pubUrl=document.getElementById("trkPub").value.trim();
     trkSaveCfg(); return trkLoad();
+  }
+  if(a==="more"){
+    const k=b.getAttribute("data-day");
+    if(k){ trk.openDays[k]=!trk.openDays[k]; return trkRender(); }
   }
   if(a==="mprev") trk.monthOffset--;
   if(a==="mnext") trk.monthOffset++;
@@ -2472,6 +2525,111 @@ document.getElementById("downloadDataBtn").addEventListener("click", ()=>{
 ========================================================================= */
 renderNav();
 render();
+</script>
+<script>
+/* =========================================================================
+   Sidebar 3D logo - Prime Kreatives crown mark (three.js, loaded on demand)
+========================================================================= */
+(function(){
+  var host=document.getElementById("brandLogo");
+  var cv=document.getElementById("brandCanvas");
+  if(!host||!cv) return;
+  function fail(){ host.style.display="none"; }
+  var s=document.createElement("script");
+  s.src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+  s.async=true;
+  s.onload=function(){ try{ build(); }catch(e){ fail(); } };
+  s.onerror=fail;
+  document.head.appendChild(s);
+
+  function build(){
+    if(typeof THREE==="undefined") return fail();
+    var r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+    r.setPixelRatio(Math.min(devicePixelRatio,2));
+    var scene=new THREE.Scene();
+    var cam=new THREE.PerspectiveCamera(35,1,0.1,100); cam.position.set(0,0,30);
+    scene.add(new THREE.AmbientLight(0xffffff,.55));
+    var k=new THREE.DirectionalLight(0xffffff,.9); k.position.set(6,8,12); scene.add(k);
+    var g1=new THREE.PointLight(0xf5a30a,1.2,60); g1.position.set(-10,-6,8); scene.add(g1);
+    var g2=new THREE.PointLight(0xf5a30a,.8,60); g2.position.set(10,6,-6); scene.add(g2);
+
+    var S=0.01,C=966;
+    var X=function(x){return (x-C)*S;}, Y=function(y){return -(y-C)*S;};
+
+    var sh=new THREE.Shape();
+    sh.moveTo(X(432),Y(364)); sh.lineTo(X(1050),Y(364));
+    sh.bezierCurveTo(X(1300),Y(364),X(1500),Y(560),X(1500),Y(790));
+    sh.bezierCurveTo(X(1500),Y(1030),X(1300),Y(1212),X(1060),Y(1212));
+    sh.lineTo(X(822),Y(1212)); sh.lineTo(X(822),Y(1422)); sh.lineTo(X(1435),Y(1422));
+    sh.lineTo(X(1435),Y(1567)); sh.lineTo(X(675),Y(1567)); sh.lineTo(X(675),Y(1085));
+    sh.lineTo(X(1040),Y(1085));
+    sh.bezierCurveTo(X(1200),Y(1085),X(1326),Y(960),X(1326),Y(800));
+    sh.bezierCurveTo(X(1326),Y(630),X(1200),Y(490),X(1030),Y(490));
+    sh.lineTo(X(582),Y(490)); sh.lineTo(X(582),Y(1567)); sh.lineTo(X(432),Y(1567)); sh.lineTo(X(432),Y(364));
+
+    var crown=new THREE.Shape();
+    crown.moveTo(X(685),Y(1047));
+    [[655,860],[820,975],[928,787],[1035,970],[1195,858],[1170,1020],[1070,1047],[685,1047]].forEach(function(p){
+      crown.lineTo(X(p[0]),Y(p[1]));
+    });
+
+    var ec=document.createElement("canvas"); ec.width=512; ec.height=256;
+    var x2=ec.getContext("2d");
+    var gr=x2.createLinearGradient(0,0,0,256);
+    gr.addColorStop(0,"#ffffff"); gr.addColorStop(.45,"#8a8fb0"); gr.addColorStop(.55,"#1d1f33"); gr.addColorStop(1,"#f5a30a");
+    x2.fillStyle=gr; x2.fillRect(0,0,512,256);
+    x2.fillStyle="#fff"; x2.fillRect(60,40,80,50); x2.fillRect(330,30,110,40);
+    var et=new THREE.CanvasTexture(ec); et.mapping=THREE.EquirectangularReflectionMapping;
+    scene.environment=new THREE.PMREMGenerator(r).fromEquirectangular(et).texture;
+
+    var white=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2,metalness:.35,envMapIntensity:.9});
+    var gold=new THREE.MeshStandardMaterial({color:0xf0a010,roughness:.22,metalness:1,envMapIntensity:1.3});
+    var grp=new THREE.Group();
+    function add(shape,depth,bev){
+      var geo=new THREE.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:true,bevelThickness:bev,bevelSize:bev*.8,bevelSegments:8,curveSegments:32});
+      geo.translate(0,0,-depth/2);
+      grp.add(new THREE.Mesh(geo,[white,gold]));
+    }
+    add(sh,4,.5);
+    add(crown,2.2,.3);
+    [[648,827,40],[928,750,42],[1214,827,39]].forEach(function(p){
+      var m=new THREE.Mesh(new THREE.SphereGeometry(p[2]*S*1.1,32,20),white);
+      m.position.set(X(p[0]),Y(p[1]),0);
+      grp.add(m);
+    });
+    grp.scale.set(1.25,1.25,1.25);
+    scene.add(grp);
+
+    var drag=false,px=0,rotY=0,t=0,running=true;
+    cv.addEventListener("pointerdown",function(e){ drag=true; px=e.clientX; try{cv.setPointerCapture(e.pointerId);}catch(_){} });
+    cv.addEventListener("pointermove",function(e){ if(!drag) return; rotY+=(e.clientX-px)*.01; px=e.clientX; });
+    cv.addEventListener("pointerup",function(){ drag=false; });
+    cv.addEventListener("pointercancel",function(){ drag=false; });
+
+    function fit(){
+      var w=host.clientWidth||260, h=host.clientHeight||150;
+      if(!w||!h) return;
+      r.setSize(w,h,false);
+      cam.aspect=w/h; cam.updateProjectionMatrix();
+    }
+    if(window.ResizeObserver) new ResizeObserver(fit).observe(host); else addEventListener("resize",fit);
+    fit();
+
+    function loop(){
+      if(!running) return;
+      requestAnimationFrame(loop);
+      t+=.01;
+      if(!drag) rotY=Math.sin(t*.6)*.55;
+      grp.rotation.y=rotY;
+      grp.rotation.x=Math.sin(t*.4)*.08;
+      r.render(scene,cam);
+    }
+    document.addEventListener("visibilitychange",function(){
+      if(document.hidden){ running=false; } else if(!running){ running=true; loop(); }
+    });
+    loop();
+  }
+})();
 </script>
 </body>
 </html>
