@@ -520,6 +520,23 @@ a{color:inherit;}
 .trk-appt em{color:#fff;background:var(--green);font-style:normal;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:100px;display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;}
 .trk-raw-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0;}
 .trk-raw-toolbar .trk-input{min-width:200px;flex:1;}
+.trk-search{position:relative;display:flex;align-items:center;flex:1;min-width:240px;max-width:520px;}
+.trk-search .sicon{position:absolute;left:12px;color:var(--steel-400);font-size:13px;pointer-events:none;}
+.trk-search .trk-input{width:100%;padding:9px 34px 9px 36px;}
+.trk-search .trk-input:focus{outline:none;border-color:var(--amber);}
+.trk-search-clear{position:absolute;right:8px;background:var(--graphite-700);border:1px solid var(--graphite-600);color:var(--steel-300);border-radius:6px;font-size:12px;line-height:1;padding:3px 7px;cursor:pointer;}
+.trk-search-clear:hover{border-color:var(--amber);color:var(--amber);}
+.trk-th-edit{width:44px;}
+.trk-edit{background:transparent;border:1px solid var(--graphite-600);border-radius:6px;color:var(--pk-sand);cursor:pointer;padding:4px 8px;font-size:13px;line-height:1;}
+.trk-edit:hover{border-color:var(--amber);color:var(--amber);}
+.trk-edit.save{border-color:var(--green);background:rgba(74,168,102,.16);color:#8ee0a6;}
+.trk-edit.save:hover{background:var(--green);color:#fff;border-color:var(--green);}
+.trk-rowacts{display:flex;gap:6px;justify-content:center;}
+.trk-cell-input{width:100%;background:var(--graphite-950);border:1px solid var(--amber);color:var(--white);border-radius:6px;padding:6px 7px;font-size:13px;font-family:var(--font-body);}
+.trk-cell-input:focus{outline:none;box-shadow:0 0 0 2px rgba(245,163,10,.25);}
+tr.trk-editing td{background:rgba(245,163,10,.07);}
+tr.trk-editing td:first-child{box-shadow:inset 3px 0 0 var(--amber);}
+.trk-savemsg{font-size:12px;color:var(--teal);font-family:var(--font-mono);margin:-4px 0 10px;line-height:1.5;}
 .trk-seg{display:flex;gap:4px;}
 .trk-seg .trk-btn.active{border-color:var(--amber);color:var(--amber);}
 .trk-tablewrap{overflow-x:auto;border:1px solid var(--graphite-800);border-radius:var(--radius);}
@@ -1740,7 +1757,8 @@ const TRK_DEFAULTS = {
   roCol:"",          // blank = auto-detect
   repCol:"",         // blank = auto-detect
   gid:"",            // optional: tab gid (number in the sheet URL after gid=)
-  pubUrl:""          // optional: "Publish to web" CSV link (most reliable for IMPORTRANGE sheets)
+  pubUrl:"",         // optional: "Publish to web" CSV link (most reliable for IMPORTRANGE sheets)
+  saveUrl:""         // optional: Apps Script web app /exec URL used to write edits back to the sheet
 };
 const trk = {
   cfg:Object.assign({}, TRK_DEFAULTS),
@@ -1752,6 +1770,8 @@ const trk = {
   scrolledToWeek:false, // jump the day grid to the current week only on first load
   daysScroll:0,      // remembered horizontal position of the day grid
   openDays:{},       // day keys the user expanded with "+N more"
+  editRow:null,      // sheet row number currently being edited in the table
+  saveMsg:"",        // feedback line for the row editor
   showSettings:false,
   loadedAt:null,
   rawQuery:"",
@@ -1923,9 +1943,13 @@ async function trkLoad(){
     if(seen[n]){ seen[n]++; n=n+" ("+seen[n]+")"; } else seen[n]=1;
     return n;
   });
-  const body=all.slice(hi+1).filter(r=>r.some(x=>String(x).trim()));
+  const body=all.slice(hi+1);
   trk.headers=heads;
-  trk.rows=body.map(r=>{ const o={}; heads.forEach((h,i)=>{ o[h]=String(r[i]==null?"":r[i]).trim(); }); return o; });
+  trk.rows=body.map((r,i)=>{
+    const o={}; heads.forEach((h,j)=>{ o[h]=String(r[j]==null?"":r[j]).trim(); });
+    o._row=hi+2+i;                 // 1-based row number inside the Google Sheet (for writing edits back)
+    return o;
+  }).filter(o=>heads.some(h=>String(o[h]).trim()));
   trk.diag={method,rows:trk.rows.length,headerRow:hi+1,
     refErr:all.slice(0,40).some(r=>r.some(x=>/^#(REF|N\/A|ERROR|VALUE)/i.test(String(x).trim())))};
   trk.status="ok"; trk.loadedAt=new Date();
@@ -2046,6 +2070,7 @@ function trkSettingsHTML(){
     <label>RO column${sel("trkRoCol",c.roCol)}</label>
     <label>Tab gid (optional)<input id="trkGid" class="trk-input" placeholder="number after gid= in the sheet URL" value="${esc(c.gid||"")}"></label>
     <label>Published CSV link (optional)<input id="trkPub" class="trk-input" placeholder="File > Share > Publish to web > CSV" value="${esc(c.pubUrl||"")}"></label>
+    <label>Apps Script save URL (optional)<input id="trkSaveUrl" class="trk-input" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(c.saveUrl||"")}"></label>
     <div class="trk-detected">Using → Rep: <b>${esc(cols.rep||"—")}</b> · Date: <b>${esc(cols.date||"—")}</b> · RO: <b>${esc(cols.ro||"—")}</b>${trk.diag?`<br>Loaded <b>${trk.diag.rows}</b> rows via ${esc(trk.diag.method)} · header on row ${trk.diag.headerRow}`:""}<br>Details → VIN: <b>${esc(dc.vin||"—")}</b> · Name: <b>${esc(dc.name||"—")}</b> · Phone: <b>${esc(dc.phone||"—")}</b> · Service: <b>${esc(dc.service||"—")}</b><br>F=Date Made: <b>${esc(dc.dateMade||"—")}</b> · G=Appt Date: <b>${esc(dc.apptDate||"—")}</b> · H=RO: <b>${esc(dc.ro||"—")}</b> · I=Notes: <b>${esc(dc.notes||"—")}</b><br>Columns found: ${esc(trk.headers.join(" | ")||"—")}</div>
     <button class="trk-btn primary" data-trk="save">Save &amp; Reload</button>
   </div>`;
@@ -2137,11 +2162,34 @@ function trkMonthRawHTML(rows,cols){
   const q=(trk.rawQuery||"").trim().toLowerCase();
   if(trk.rawFilter==="show") list=list.filter(x=>x.show);
   if(trk.rawFilter==="pend") list=list.filter(x=>!x.show);
-  if(q) list=list.filter(x=>((x.vin||"")+" "+(x.cust||"")+" "+(x.phone||"")+" "+(x.service||"")+" "+(x.dateMade||"")+" "+(x.apptDate||"")+" "+(x.ro||"")+" "+(x.notes||"")).toLowerCase().includes(q));
+  // search bar matches VIN, Name or Phone # only
+  if(q) list=list.filter(x=>((x.vin||"")+" "+(x.cust||"")+" "+(x.phone||"")).toLowerCase().includes(q));
   const shows=list.filter(x=>x.show).length;
   const label=trk.monthOffset===0?"This Month":trk.monthOffset===-1?"Last Month":trk.monthOffset===1?"Next Month":trkFmt(start,{month:"long",year:"numeric"});
+  const dcols=trkDetailCols();
   const rowsHtml=list.map(x=>{
-    return `<tr><td style="font-family:var(--font-mono);white-space:nowrap">${esc(x.vin||"—")}</td><td>${esc(x.cust||"—")}</td><td style="white-space:nowrap">${esc(x.phone||"—")}</td><td>${esc(x.service||"—")}</td><td style="white-space:nowrap">${esc(x.dateMade||"—")}</td><td style="white-space:nowrap">${esc(x.apptDate||trkFmt(x.d,{month:"short",day:"numeric"}))}</td><td style="font-family:var(--font-mono)">${esc(x.ro||"—")}</td><td>${esc(x.notes||"—")}</td></tr>`;
+    const rr=x.raw?x.raw._row:null;
+    if(rr!=null&&trk.editRow===rr){
+      const cell=(field,hdr)=>`<td><input class="trk-cell-input" data-editfield="${field}" value="${esc(hdr?(x.raw[hdr]||""):"")}" autocomplete="off"></td>`;
+      return `<tr class="trk-editing" data-editrow="${rr}">
+        ${cell("vin",dcols.vin)}${cell("cust",dcols.name)}${cell("phone",dcols.phone)}${cell("service",dcols.service)}
+        ${cell("dateMade",dcols.dateMade)}${cell("apptDate",dcols.apptDate)}${cell("ro",dcols.ro)}${cell("notes",dcols.notes)}
+        <td><div class="trk-rowacts">
+          <button class="trk-edit save" type="button" data-trk="editsave" data-row="${rr}" title="Save to Google Sheet">💾</button>
+          <button class="trk-edit" type="button" data-trk="editcancel" title="Cancel">✕</button>
+        </div></td></tr>`;
+    }
+    return `<tr>
+      <td style="font-family:var(--font-mono);white-space:nowrap">${esc(x.vin||"—")}</td>
+      <td>${esc(x.cust||"—")}</td>
+      <td style="white-space:nowrap">${esc(x.phone||"—")}</td>
+      <td>${esc(x.service||"—")}</td>
+      <td style="white-space:nowrap">${esc(x.dateMade||"—")}</td>
+      <td style="white-space:nowrap">${esc(x.apptDate||trkFmt(x.d,{month:"short",day:"numeric"}))}</td>
+      <td style="font-family:var(--font-mono)">${esc(x.ro||"—")}</td>
+      <td>${esc(x.notes||"—")}</td>
+      <td>${rr!=null?`<button class="trk-edit" type="button" data-trk="edit" data-row="${rr}" title="Edit this row">✏️</button>`:""}</td>
+    </tr>`;
   }).join("");
   return `
   <div class="trk-panel">
@@ -2164,12 +2212,18 @@ function trkMonthRawHTML(rows,cols){
     </div>
     ${trk.rawOpen?`
     <div class="trk-raw-toolbar">
-      <input id="trkRawSearch" class="trk-input" placeholder="Filter by VIN, name, phone, service, RO, notes…" value="${esc(trk.rawQuery||"")}">
+      <div class="trk-search">
+        <span class="sicon">🔎</span>
+        <input id="trkRawSearch" class="trk-input" placeholder="Search by VIN, Name or Phone #…" autocomplete="off" value="${esc(trk.rawQuery||"")}">
+        ${trk.rawQuery?`<button class="trk-search-clear" type="button" data-trk="rawclear" title="Clear search">✕</button>`:""}
+      </div>
+      <span class="trk-count">showing ${list.length} of ${rows.length}</span>
     </div>
+    ${trk.saveMsg?`<div class="trk-savemsg">${esc(trk.saveMsg)}</div>`:""}
     <div class="trk-tablewrap">
       <table class="trk-table">
-        <thead><tr><th>VIN</th><th>Name</th><th>Phone #</th><th>Service Type</th><th>Date Made</th><th>Appt Date</th><th>RO</th><th>Notes</th></tr></thead>
-        <tbody>${rowsHtml||'<tr><td colspan="8" style="color:var(--steel-400)">No appointments match this filter for this month.</td></tr>'}</tbody>
+        <thead><tr><th>VIN</th><th>Name</th><th>Phone #</th><th>Service Type</th><th>Date Made</th><th>Appt Date</th><th>RO</th><th>Notes</th><th class="trk-th-edit" title="Edit">✎</th></tr></thead>
+        <tbody>${rowsHtml||'<tr><td colspan="9" style="color:var(--steel-400)">No appointments match this search for this month.</td></tr>'}</tbody>
       </table>
     </div>`:""}
   </div>`;
@@ -2185,7 +2239,7 @@ function trkDownloadMonthCSV(){
     const q=(trk.rawQuery||"").trim().toLowerCase();
     if(trk.rawFilter==="show") l=l.filter(x=>x.show);
     if(trk.rawFilter==="pend") l=l.filter(x=>!x.show);
-    if(q) l=l.filter(x=>((x.vin||"")+" "+(x.cust||"")+" "+(x.phone||"")+" "+(x.service||"")+" "+(x.dateMade||"")+" "+(x.apptDate||"")+" "+(x.ro||"")+" "+(x.notes||"")).toLowerCase().includes(q));
+    if(q) l=l.filter(x=>((x.vin||"")+" "+(x.cust||"")+" "+(x.phone||"")).toLowerCase().includes(q));
     return l;
   }
   const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
@@ -2198,6 +2252,49 @@ function trkDownloadMonthCSV(){
   a.href=URL.createObjectURL(blob);
   a.download="monthly-appointment-details-"+start.toLocaleDateString("en-CA")+".csv";
   document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* Row editor: apply the edits to the loaded data, then POST them to the Apps Script
+   endpoint (⚙ Settings) so they land in the Google Sheet as well. */
+function trkSaveRow(rowNum){
+  const tr=document.querySelector('tr[data-editrow="'+rowNum+'"]');
+  const raw=trk.rows.filter(r=>String(r._row)===String(rowNum))[0];
+  if(!tr||!raw) return;
+  const dcols=trkDetailCols(), headers=trk.headers;
+  const map=[
+    ["vin",dcols.vin],["cust",dcols.name],["phone",dcols.phone],["service",dcols.service],
+    ["dateMade",dcols.dateMade],["apptDate",dcols.apptDate],["ro",dcols.ro],["notes",dcols.notes]
+  ];
+  const cells=[];
+  map.forEach(function(pair){
+    const field=pair[0], hdr=pair[1];
+    const input=tr.querySelector('[data-editfield="'+field+'"]');
+    if(!input||!hdr) return;
+    const val=input.value.trim();
+    if(String(raw[hdr]||"")!==val){
+      raw[hdr]=val;
+      cells.push({row:+rowNum, col:headers.indexOf(hdr)+1, value:val});
+    }
+  });
+  trk.editRow=null;
+  if(!cells.length){ trk.saveMsg="No changes to save."; return trkRender(); }
+  if(!trk.cfg.saveUrl){
+    trk.saveMsg="✓ "+cells.length+" change(s) applied in the browser only — add the Apps Script save URL in ⚙ Settings to write them into the Google Sheet.";
+    return trkRender();
+  }
+  trk.saveMsg="Saving "+cells.length+" change(s) to the Google Sheet…";
+  trkRender();
+  fetch(trk.cfg.saveUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify({tab:trk.cfg.sheetName,cells:cells})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      trk.saveMsg=(j&&j.ok)?("✓ Saved to the Google Sheet — "+((j.updated!=null)?j.updated:cells.length)+" cell(s) updated.")
+                           :("⚠ The sheet replied: "+((j&&j.error)||"unknown error"));
+      trkRender();
+    })
+    .catch(function(err){
+      trk.saveMsg="⚠ Couldn't reach the Google Sheet ("+((err&&err.message)||err)+"). Your edit is shown locally — please try Save again.";
+      trkRender();
+    });
 }
 
 document.addEventListener("click",(e)=>{
@@ -2213,12 +2310,18 @@ document.addEventListener("click",(e)=>{
     trk.cfg.roCol=document.getElementById("trkRoCol").value;
     trk.cfg.gid=document.getElementById("trkGid").value.trim();
     trk.cfg.pubUrl=document.getElementById("trkPub").value.trim();
+    const su=document.getElementById("trkSaveUrl");
+    trk.cfg.saveUrl=su?su.value.trim():"";
     trkSaveCfg(); return trkLoad();
   }
   if(a==="more"){
     const k=b.getAttribute("data-day");
     if(k){ trk.openDays[k]=!trk.openDays[k]; return trkRender(); }
   }
+  if(a==="edit"){ trk.editRow=+b.getAttribute("data-row"); trk.saveMsg=""; return trkRender(); }
+  if(a==="editcancel"){ trk.editRow=null; trk.saveMsg=""; return trkRender(); }
+  if(a==="editsave"){ return trkSaveRow(b.getAttribute("data-row")); }
+  if(a==="rawclear"){ trk.rawQuery=""; return trkRender(); }
   if(a==="mprev") trk.monthOffset--;
   if(a==="mnext") trk.monthOffset++;
   if(a==="mnow") trk.monthOffset=0;
