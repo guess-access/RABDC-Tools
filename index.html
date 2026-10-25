@@ -1267,7 +1267,7 @@ function goTo(view, id){
 ========================================================================= */
 function viewDashboard(){
   const cards = [
-    {view:"ha", icon:"✉️", title:"HA Creator", desc:"AI writes the customer email in the approved format — send it from Gmail."},
+    {view:"ha", icon:"✉️", title:"HA Creator", desc:"AI writes the customer email in the approved format — copy it and send."},
     {view:"pricing", icon:"💰", title:"Pricing", desc:"Service pricing and manager specials."},
     {view:"policy", icon:"📑", title:"Dealership Policy", desc:"Appointments, technical guidelines, logistics, and service hours — A to Z."},
     {view:"recalls", icon:"⚠️", title:"Recalls & Compliance", desc:"Recall protocol, backordered parts, NYSI."},
@@ -1751,9 +1751,9 @@ function viewCallScript(){
 }
 
 /* =========================================================================
-   HA Creator — AI-written customer email, sent from Gmail
-   - AI: Gemini key (…AIza…) or OpenAI key (sk-…) stored in this browser only
-   - Send: Google sign-in (OAuth, gmail.send scope) -> Gmail API
+   HA Creator — AI-written customer email (copy/paste ready)
+   - AI: Gemini key (…AIza…) stored in this browser only
+   - No Gmail connection: the message is copied out and sent by the agent
 ========================================================================= */
 const HA_PROMPT = `I am a service BDC agent that helps customers relay messages to the service department. Act as my personal assistant, you will write my messages professionally, Correct grammar, spelling, punctuation, and capitalization. Use Mr. or Mrs. as appropriate. I would like the body of the message, VIN, phone number and customer's name to be in one single paragraph. Phone numbers must have hyphens and parentheses.
 
@@ -1769,16 +1769,14 @@ Mrs. [name of the customer] [body of the message]. VIN: [VIN number]. Please cal
 [space]
 Thank you!`;
 
+const HA_SUBJECT = "Centereach Hyundai Customer Follow-up";
+
 const HA_DEFAULTS = {
   aiKey:"",
-  clientId:"",
-  from:"plee@rabdcsolutions.com",
-  subject:"Service Appointment Update",
   prompt:HA_PROMPT
 };
 const ha = {
   cfg:Object.assign({},HA_DEFAULTS),
-  token:null, tokenAt:0,
   busy:false
 };
 function haLoadCfg(){ try{ const s=JSON.parse(localStorage.getItem("haCfg")||"null"); if(s) ha.cfg=Object.assign({},HA_DEFAULTS,s); }catch(e){} }
@@ -1789,25 +1787,13 @@ function viewHACreator(){
   return `
     <div class="eyebrow">HA Creator</div>
     <h2 class="pagetitle">HA Creator</h2>
-    <p class="pagesub">Fill in the details, let AI write the email in the approved format, then send it straight from <strong>${esc(c.from)}</strong>.</p>
+    <p class="pagesub">Fill in the details, let AI write the email in the approved format — Mr./Mrs. is chosen automatically from the customer's name — then copy it into your email.</p>
 
     <div class="ha-card">
       <div class="ha-grid">
-        <label class="ha-field" style="grid-column:span 2;">
-          <span>To (customer email)</span>
-          <input type="email" id="haTo" class="trk-input" placeholder="customer@email.com" autocomplete="off">
-        </label>
-        <label class="ha-field">
-          <span>Subject</span>
-          <input type="text" id="haSubject" class="trk-input" value="${esc(c.subject)}">
-        </label>
-        <label class="ha-field" style="max-width:130px;">
-          <span>Title</span>
-          <select id="haTitle" class="trk-input">
-            <option value="Mrs." selected>Mrs.</option>
-            <option value="Mr.">Mr.</option>
-            <option value="Ms.">Ms.</option>
-          </select>
+        <label class="ha-field" style="grid-column:1/-1;">
+          <span>Subject (fixed)</span>
+          <input type="text" class="trk-input" value="${HA_SUBJECT}" readonly tabindex="-1">
         </label>
         <label class="ha-field">
           <span>Customer name</span>
@@ -1829,34 +1815,26 @@ function viewHACreator(){
 
       <div class="ha-actions">
         <button type="button" class="trk-btn primary" id="haGenBtn">✨ Write email (AI)</button>
-        <button type="button" class="trk-btn" id="haSendBtn">📤 Send from Gmail</button>
         <button type="button" class="trk-btn" id="haClearBtn">⟲ Clear</button>
       </div>
       <div class="ha-status" id="haStatus">${c.aiKey?"":"⚠ No AI key yet — open ⚙ Settings below to add one."}</div>
 
       <label class="ha-field" style="display:block;margin-top:10px;">
-        <span>Message preview (edit freely before sending)</span>
+        <span>Message preview (edit freely, then copy)</span>
         <textarea id="haOut" class="trk-input ha-ta ha-out" rows="10" placeholder="Your generated email will appear here."></textarea>
       </label>
       <div class="ha-actions">
         <button type="button" class="trk-btn" id="haCopyBtn">📋 Copy message</button>
+        <button type="button" class="trk-btn" id="haCopySubject">📋 Copy subject</button>
       </div>
     </div>
 
-    <details class="ha-settings" ${(!c.aiKey||!c.clientId)?"open":""}>
-      <summary>⚙ AI &amp; Gmail settings (one-time setup)</summary>
+    <details class="ha-settings" ${!c.aiKey?"open":""}>
+      <summary>⚙ AI settings (one-time setup)</summary>
       <div class="ha-grid" style="margin-top:12px;">
         <label class="ha-field" style="grid-column:1/-1;">
-          <span>AI API key (Gemini <code>AIza…</code> or OpenAI <code>sk-…</code>) — stays in this browser</span>
-          <input type="password" id="haAiKey" class="trk-input" value="${esc(c.aiKey)}" placeholder="AIza… or sk-…" autocomplete="off">
-        </label>
-        <label class="ha-field" style="grid-column:1/-1;">
-          <span>Google OAuth Client ID (Web application, Gmail send)</span>
-          <input type="text" id="haClientId" class="trk-input" value="${esc(c.clientId)}" placeholder="1234567890-abc…apps.googleusercontent.com" autocomplete="off">
-        </label>
-        <label class="ha-field" style="grid-column:1/-1;">
-          <span>Sending Gmail account</span>
-          <input type="text" id="haFrom" class="trk-input" value="${esc(c.from)}" autocomplete="off">
+          <span>AI API key (Gemini <code>AIza…</code>) — stays in this browser</span>
+          <input type="password" id="haAiKey" class="trk-input" value="${esc(c.aiKey)}" placeholder="AIza…" autocomplete="off">
         </label>
         <label class="ha-field" style="grid-column:1/-1;">
           <span>Writing instructions the AI follows</span>
@@ -1919,7 +1897,6 @@ async function haGenerate(){
   const vin = document.getElementById("haVin").value.trim();
   const phone = document.getElementById("haPhone").value.trim();
   const req = document.getElementById("haRequest").value.trim();
-  const title = document.getElementById("haTitle").value;
   if(!name && !req){ haSetStatus("⚠ Fill in the customer name and what the message should say.","warn"); return; }
   if(!ha.cfg.aiKey.trim()){ haSetStatus("⚠ Add your AI API key in ⚙ Settings below first.","warn"); return; }
   ha.busy = true;
@@ -1929,16 +1906,17 @@ async function haGenerate(){
   haSetStatus("Writing your email…");
   const userText = [
     "Write today's message using these details:",
-    "Title (Mr./Mrs./Ms.): "+title,
     "Customer name: "+(name||"(not provided)"),
     "VIN: "+(vin||"(not provided)"),
     "Phone number: "+(phone||"(not provided)"),
-    "What the message should say: "+(req||"(use the details above)")
+    "What the message should say: "+(req||"(use the details above)"),
+    "",
+    "Choose Mr. or Mrs. automatically based on the customer's name, and start the message with Good day, followed by the greeting with that title on its own line."
   ].join("\n");
   try{
     const out = await haAI(userText, ha.cfg.prompt || HA_PROMPT);
     document.getElementById("haOut").value = out;
-    haSetStatus("✓ Email written — check it below, then Send or Copy.","ok");
+    haSetStatus("✓ Email written — check it below, then Copy it into your message.","ok");
   }catch(err){
     let msg = (err && err.message) || "AI call failed.";
     if(msg==="Failed to fetch" && ha.cfg.aiKey.trim().startsWith("sk-")){
@@ -1951,103 +1929,30 @@ async function haGenerate(){
   }
 }
 
-function haLoadGIS(){
-  return new Promise((resolve,reject)=>{
-    const ready = !!(window.google && google.accounts && google.accounts.oauth2);
-    if(ready) return resolve();
-    const wait = (tries)=>{ if(window.google && google.accounts && google.accounts.oauth2) return resolve();
-      if(tries<=0) return reject(new Error("Google sign-in didn't finish loading — check your connection."));
-      setTimeout(()=>wait(tries-1), 200); };
-    if(document.getElementById("haGis")) return wait(50);
-    const s = document.createElement("script");
-    s.id = "haGis"; s.src = "https://accounts.google.com/gsi/client"; s.async = true;
-    s.onerror = ()=>reject(new Error("Couldn't load Google sign-in (script blocked or offline)."));
-    document.head.appendChild(s);
-    wait(50);
-  });
-}
-
-async function haGetToken(){
-  await haLoadGIS();
-  if(ha.token && (Date.now()-ha.tokenAt) < 50*60*1000) return ha.token;
-  return new Promise((resolve,reject)=>{
-    let client;
-    try{
-      client = google.accounts.oauth2.initTokenClient({
-        client_id: ha.cfg.clientId.trim(),
-        scope: "https://www.googleapis.com/auth/gmail.send",
-        login_hint: ha.cfg.from.trim(),
-        callback: (r)=>{ if(r && r.access_token){ ha.token = r.access_token; ha.tokenAt = Date.now(); resolve(ha.token); }
-          else reject(new Error("Google sign-in was cancelled.")); },
-        error_callback: (e)=>reject(new Error("Google sign-in failed: "+((e && (e.message||e.type))||"denied")+"."))
-      });
-    }catch(err){ return reject(new Error("Invalid Google Client ID — check ⚙ Settings.")); }
-    client.requestAccessToken();
-  });
-}
-
-async function haSend(){
-  if(ha.busy) return;
-  const to = document.getElementById("haTo").value.trim();
-  const subject = document.getElementById("haSubject").value.trim() || ha.cfg.subject;
-  const body = document.getElementById("haOut").value.trim();
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){ haSetStatus("⚠ Enter a valid To address (the customer's email).","warn"); return; }
-  if(!body){ haSetStatus("⚠ Write or generate the message first.","warn"); return; }
-  if(!ha.cfg.clientId.trim()){ haSetStatus("⚠ Add your Google OAuth Client ID in ⚙ Settings below first.","warn"); return; }
-  ha.busy = true;
-  const btn = document.getElementById("haSendBtn");
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = "⏳ Signing in…";
-  haSetStatus("Waiting for Google sign-in…");
-  try{
-    const token = await haGetToken();
-    btn.textContent = "⏳ Sending…";
-    haSetStatus("Sending through Gmail…");
-    const from = ha.cfg.from.trim();
-    const raw = ["From: "+from,"To: "+to,"Subject: "+subject,"MIME-Version: 1.0",'Content-Type: text/plain; charset="UTF-8"',"",body].join("\r\n");
-    const b64 = btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",{
-      method:"POST",
-      headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({raw:b64})
-    });
-    if(!res.ok){
-      const t = await res.text().catch(()=> "");
-      if(res.status===401){ ha.token = null; throw new Error("Google session expired — press Send again to re-sign-in."); }
-      throw new Error("Gmail refused the send ("+res.status+"): "+(t.slice(0,200)||"no details"));
-    }
-    haSetStatus("✓ Sent to "+to+" from "+from+".","ok");
-  }catch(err){
-    haSetStatus("⚠ "+(err && err.message || "Send failed."),"warn");
-  }finally{
-    ha.busy = false;
-    btn.disabled = false; btn.textContent = old;
-  }
-}
-
 function wireHA(){
   const $ = (id)=>document.getElementById(id);
   const phone = $("haPhone");
   if(phone) phone.addEventListener("input", ()=>haFmtPhone(phone));
   const gen = $("haGenBtn"); if(gen) gen.addEventListener("click", haGenerate);
-  const send = $("haSendBtn"); if(send) send.addEventListener("click", haSend);
   const copy = $("haCopyBtn"); if(copy) copy.addEventListener("click", ()=>{
     const ta = $("haOut");
     if(ta && ta.value && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(()=>{
       const t = copy.textContent; copy.textContent = "✓ Copied"; setTimeout(()=>copy.textContent = t, 1400);
     }).catch(()=>{});
   });
+  const copySubj = $("haCopySubject"); if(copySubj) copySubj.addEventListener("click", ()=>{
+    if(navigator.clipboard) navigator.clipboard.writeText(HA_SUBJECT).then(()=>{
+      const t = copySubj.textContent; copySubj.textContent = "✓ Copied"; setTimeout(()=>copySubj.textContent = t, 1400);
+    }).catch(()=>{});
+  });
   const clear = $("haClearBtn"); if(clear) clear.addEventListener("click", ()=>{
-    ["haTo","haName","haVin","haPhone","haRequest","haOut"].forEach(id=>{ const el=$(id); if(el) el.value = ""; });
+    ["haName","haVin","haPhone","haRequest","haOut"].forEach(id=>{ const el=$(id); if(el) el.value = ""; });
     haSetStatus("Cleared.");
   });
   const save = $("haCfgSave"); if(save) save.addEventListener("click", ()=>{
     ha.cfg.aiKey = $("haAiKey").value.trim();
-    ha.cfg.clientId = $("haClientId").value.trim();
-    ha.cfg.from = $("haFrom").value.trim() || HA_DEFAULTS.from;
-    ha.cfg.subject = $("haSubject").value.trim() || HA_DEFAULTS.subject;
     ha.cfg.prompt = $("haPrompt").value.trim() || HA_PROMPT;
-    haSaveCfg(); ha.token = null;
+    haSaveCfg();
     const el = $("haCfgStatus");
     if(el){ el.textContent = "✓ Saved (kept in this browser)."; el.className = "ha-status ok";
       setTimeout(()=>{ if(el) el.textContent = ""; }, 2500); }
@@ -2057,7 +1962,6 @@ function wireHA(){
     const el = $("haCfgStatus");
     if(el){ el.textContent = "Default instructions restored — press 💾 Save settings to keep them."; el.className = "ha-status ok"; }
   });
-  const subj = $("haSubject"); if(subj) subj.addEventListener("change", ()=>{ ha.cfg.subject = subj.value.trim() || HA_DEFAULTS.subject; haSaveCfg(); });
 }
 
 function viewPractices(){
