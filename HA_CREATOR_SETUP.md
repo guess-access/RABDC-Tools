@@ -39,8 +39,11 @@ on the page and included in the subject box for pasting.
 
 | Message | Fix |
 |---|---|
-| `⚠ Add your AI API key…` | Paste the Gemini key (step 1). |
-| `Gemini replied 400… API key not valid` | Wrong/pasted-with-space key — copy it again. |
+| `⚠ Add your AI key…` / no key | Paste the Gemini key (step 1). |
+| `Gemini says the key is not valid` | Re-copy the **full** key from aistudio.google.com/app/apikey — starts with `AIza`, ~39 characters, no spaces. Still failing? Delete it and create a fresh key (that link enables the API automatically). Press **🧪 Test key** to confirm before writing. |
+| `key has an HTTP-referrer restriction` | In Google Cloud → Credentials, edit the key: remove the restriction or add `https://rabdc-solutions.netlify.app`. |
+| `The Generative Language API isn't enabled` | The key came from Cloud Console for another project — make it at aistudio.google.com/app/apikey instead. |
+| `The key contains a space` / `truncated` | Copy it again — the clipboard probably caught a partial string. |
 | `⚠ Fill in the customer name…` | Enter at least the name or the message request. |
 
 The writing instructions (structure, wording rules) are editable in

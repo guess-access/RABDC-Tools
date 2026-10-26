@@ -1843,6 +1843,7 @@ function viewHACreator(){
       </div>
       <div class="ha-actions">
         <button type="button" class="trk-btn primary" id="haCfgSave">💾 Save settings</button>
+        <button type="button" class="trk-btn" id="haTestBtn">🧪 Test key</button>
         <button type="button" class="trk-btn" id="haPromptReset">↺ Restore default instructions</button>
       </div>
       <div class="ha-status" id="haCfgStatus"></div>
@@ -1863,6 +1864,49 @@ function haFmtPhone(input){
   else if(d.length>3) out = "("+d.slice(0,3)+") "+d.slice(3);
   else if(d.length>0) out = "("+d;
   input.value = out;
+}
+
+/* Returns a friendly problem string if the key obviously can't work, else null. */
+function haKeyProblem(raw){
+  const key = raw.trim();
+  if(!key) return "No AI key yet — add one in ⚙ Settings (free Gemini key from aistudio.google.com/app/apikey).";
+  if(key.startsWith("sk-")) return "That's an OpenAI key — OpenAI can't be called from a website. Use a Gemini key instead (starts with AIza…).";
+  if(/\s/.test(key)) return "The key contains a space — copy it again from aistudio.google.com/app/apikey.";
+  if(!key.startsWith("AIza")) return 'That doesn\'t look like a Gemini key (should start with "AIza"). Copy the full key from aistudio.google.com/app/apikey.';
+  if(key.length < 35) return "The key looks truncated ("+key.length+" chars, a Gemini key is ~39). Copy the full key again.";
+  return null;
+}
+
+/* Turns raw API errors into plain-English fixes. */
+function haFriendlyError(msg){
+  msg = (msg||"");
+  if(msg==="Failed to fetch") return "Couldn't reach the AI service — check your internet connection, then try again.";
+  if(/API key not valid|API_KEY_INVALID|INVALID_ARGUMENT/.test(msg)){
+    return 'Gemini says the key is not valid. Re-copy the full key from https://aistudio.google.com/app/apikey (starts with AIza, ~39 characters, no spaces). If it still fails, create a fresh key there.';
+  }
+  if(/API_KEY_HTTP_REFERRER_BLOCKED|requests from this referrer/i.test(msg)){
+    return "That key has an HTTP-referrer restriction that blocks this site. In Google Cloud → Credentials, edit the key and either remove the restriction or add https://rabdc-solutions.netlify.app.";
+  }
+  if(/haven't been enabled|not been used|SERVICE_DISABLED/i.test(msg)){
+    return "The Generative Language API isn't enabled for that key's project — open https://aistudio.google.com/app/apikey and create the key from there (it enables the API automatically).";
+  }
+  if(/quota|RESOURCE_EXHAUSTED|429/.test(msg)) return "Rate limit reached — wait a minute and try again.";
+  return msg.length>220 ? msg.slice(0,220)+"…" : msg;
+}
+
+/* One tiny real call so the user can verify the key before writing emails. */
+async function haTestKey(){
+  const el = document.getElementById("haCfgStatus");
+  const raw = (document.getElementById("haAiKey")||{}).value || "";
+  const bad = haKeyProblem(raw);
+  if(bad){ if(el){ el.textContent = "⚠ "+bad; el.className = "ha-status warn"; } return; }
+  if(el){ el.textContent = "🧪 Testing the key with Gemini…"; el.className = "ha-status"; }
+  try{
+    await haAI("Reply with just: OK", "You are a connectivity test.");
+    if(el){ el.textContent = "✓ Key works — Gemini responded. Press 💾 Save settings to keep it."; el.className = "ha-status ok"; }
+  }catch(err){
+    if(el){ el.textContent = "⚠ "+haFriendlyError(err && err.message); el.className = "ha-status warn"; }
+  }
 }
 
 function haAI(userText, prompt){
@@ -1898,7 +1942,8 @@ async function haGenerate(){
   const phone = document.getElementById("haPhone").value.trim();
   const req = document.getElementById("haRequest").value.trim();
   if(!name && !req){ haSetStatus("⚠ Fill in the customer name and what the message should say.","warn"); return; }
-  if(!ha.cfg.aiKey.trim()){ haSetStatus("⚠ Add your AI API key in ⚙ Settings below first.","warn"); return; }
+  const keyBad = haKeyProblem(ha.cfg.aiKey);
+  if(keyBad){ haSetStatus("⚠ "+keyBad,"warn"); return; }
   ha.busy = true;
   const btn = document.getElementById("haGenBtn");
   const old = btn.textContent;
@@ -1918,10 +1963,10 @@ async function haGenerate(){
     document.getElementById("haOut").value = out;
     haSetStatus("✓ Email written — check it below, then Copy it into your message.","ok");
   }catch(err){
-    let msg = (err && err.message) || "AI call failed.";
-    if(msg==="Failed to fetch" && ha.cfg.aiKey.trim().startsWith("sk-")){
-      msg = "OpenAI keys can't be called from a browser (CORS). Use a free Gemini key instead (starts with AIza — aistudio.google.com → Get API key).";
-    }
+    let raw = (err && err.message) || "";
+    let msg = (raw==="Failed to fetch" && ha.cfg.aiKey.trim().startsWith("sk-"))
+      ? "OpenAI keys can't be called from a browser (CORS). Use a free Gemini key instead (starts with AIza — aistudio.google.com → Get API key)."
+      : haFriendlyError(raw);
     haSetStatus("⚠ "+msg,"warn");
   }finally{
     ha.busy = false;
@@ -1957,6 +2002,7 @@ function wireHA(){
     if(el){ el.textContent = "✓ Saved (kept in this browser)."; el.className = "ha-status ok";
       setTimeout(()=>{ if(el) el.textContent = ""; }, 2500); }
   });
+  const test = $("haTestBtn"); if(test) test.addEventListener("click", haTestKey);
   const reset = $("haPromptReset"); if(reset) reset.addEventListener("click", ()=>{
     $("haPrompt").value = HA_PROMPT;
     const el = $("haCfgStatus");
